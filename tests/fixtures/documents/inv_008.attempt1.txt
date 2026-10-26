@@ -1,0 +1,13 @@
+INVOICE
+
+Invoice Number: INV-20745
+Date: 2026-08-03
+Customer: Umbrella Retail Pvt Ltd
+Customer ID: CUST-1004
+
+Point-of-sale terminals
+
+Subtotal: 84,745.76
+Tax: 15,254.24
+Total: 100,000.00
+Currency: INR

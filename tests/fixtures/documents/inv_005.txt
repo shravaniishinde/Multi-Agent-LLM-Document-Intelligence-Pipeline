@@ -1,0 +1,9 @@
+lNVOICE
+
+Invoice Number: INV-2O61?
+Date: 1?/0?/2026
+Customer: Acme Corporatlon
+Customer ID: CUST-1O0l
+
+Total: 8,9S0.0O
+Currency: U5D

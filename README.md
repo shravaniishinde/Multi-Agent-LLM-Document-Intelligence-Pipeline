@@ -1,346 +1,193 @@
-# Invoice Reconciliation Multi-Agent System
+# Multi-Agent LLM Document Intelligence Pipeline
 
-[![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-
-An intelligent, production-ready multi-agent system for automated invoice reconciliation using LangGraph and large language models.
-
-## Table of Contents
-
-- [Overview](#overview)
-- [Key Features](#key-features)
-- [System Architecture](#system-architecture)
-- [Technology Stack](#technology-stack)
-- [Installation](#installation)
-- [Usage](#usage)
-- [Project Structure](#project-structure)
-- [Test Coverage](#test-coverage)
-- [Limitations & Future Enhancements](#limitations--future-enhancements)
-- [Contributing](#contributing)
-- [License](#license)
-
-## Overview of the System
-
-This system automates invoice reconciliation workflows by leveraging an advanced multi-agent architecture to process supplier invoices, match them against purchase orders, detect discrepancies, and make intelligent approval decisions. The system handles real-world document complexity including scanned PDFs, varied formats, and incomplete data.
-
-### Problem Statement
-
-Manual invoice reconciliation in enterprise environments is:
-- **Time-intensive**: Requires significant human resources for document review
-- **Error-prone**: Subject to human oversight and inconsistent application of rules
-- **Non-scalable**: Processing time increases linearly with invoice volume
-- **Risk-exposed**: Vulnerable to fraud, duplicate payments, and compliance violations
-
-### Solution
-
-This multi-agent system automates 80-90% of invoice reconciliation workflows while maintaining human oversight for high-risk cases through intelligent escalation mechanisms.
-
-The system also includes a professional review dashboard that mirrors real enterprise workflows by separating automatically approved invoices from those requiring human intervention, complete with PDF previews, agent reasoning traces, and AI-generated explanations for escalations.
-
-## Key Features 
-
-- **Intelligent Document Processing**  
-  OCR-based extraction combined with LLM-powered structuring to handle scanned PDFs, rotated documents, and heterogeneous invoice templates.
-
-- **True Multi-Agent Orchestration**  
-  LangGraph-based agent coordination with explicit state handoffs, conditional routing, and non-linear execution paths.
-
-- **Robust PO Matching Engine**  
-  Hybrid matching strategy using direct PO references, fuzzy string matching, and confidence scoring to handle incomplete or missing identifiers.
-
-- **Discrepancy Detection & Risk Classification**  
-  Automated detection of price mismatches, quantity discrepancies, missing items, and missing PO references with severity-aware classification.
-
-- **Confidence-Based Decision Making**  
-  Automated routing into:
-  - AUTO_APPROVE  
-  - REQUEST_CLARIFICATION  
-  - ESCALATE_TO_HUMAN  
-  based on discrepancy severity and match confidence.
-
-- **Human-in-the-Loop Workflow**  
-  High-risk or low-confidence invoices are escalated to human review with full context, supporting safe financial decision-making.
-
-- **LLM-Generated Human Review Explanation**  
-  For invoices requiring manual review, the system generates a concise natural-language explanation describing *why* human intervention is required.
-
-- **Real-Time Agent Reasoning Transparency**  
-  Live, step-by-step streaming of each agent’s internal reasoning, displayed as a chat-style activity feed with agent-specific color coding.
-
-- **Interactive Review Dashboard**  
-  Streamlit-based UI featuring:
-  - Multi-invoice batch upload
-  - Auto-Approved vs Human Review tabs
-  - Side-by-side PDF preview and reasoning trace
-  - Structured outputs and audit-friendly explanations
-
-- **Fault-Tolerant Design**  
-  Graceful handling of OCR failures, LLM parsing errors, missing data, and ambiguous matches without system crashes.
-
-### Decision Outcomes of the System
-
-- **AUTO_APPROVE**: Clean matches with no material discrepancies
-- **REQUEST_CLARIFICATION**: Minor issues requiring supplier follow-up
-- **ESCALATE_TO_HUMAN**: Critical discrepancies requiring manual review
-
-## System Architecture
+A four-agent **LangGraph** pipeline that turns scanned business documents (invoices,
+receipts) into validated, schema-checked records. Fields are checked against
+reference data retrieved through **RAG**. Unreadable scans are retried with a fixed
+limit, and anything uncertain goes to a supervisory review.
 
 ```
-┌─────────────────────┐
-│  Document Upload    │
-└──────────┬──────────┘
-           │
-           ▼
-┌─────────────────────────────────────────────────────────────┐
-│                    Agent Pipeline                            │
-├─────────────────────────────────────────────────────────────┤
-│                                                              │
-│  ┌──────────────┐    ┌──────────────┐    ┌──────────────┐ │
-│  │  Document    │───▶│   Matching   │───▶│ Discrepancy  │ │
-│  │    Agent     │    │    Agent     │    │    Agent     │ │
-│  └──────────────┘    └──────────────┘    └──────┬───────┘ │
-│         │                                         │         │
-│         │                                         ▼         │
-│         │                              ┌──────────────┐    │
-│         │                              │  Resolution  │    │
-│         │                              │    Agent     │    │
-│         │                              └──────┬───────┘    │
-│         │                                     │            │
-│         ▼                                     ▼            │
-│  ┌──────────────────────────────────────────────────┐     │
-│  │         Human Review Agent (Optional)            │     │
-│  └──────────────────────────────────────────────────┘     │
-│                                                             │
-└─────────────────────────────────────────────────────────────┘
-           │
-           ▼
-┌─────────────────────┐
-│   Result Output     │
-└─────────────────────┘
+OCR Extraction ─► Field Validation ─► Schema Structuring ─► Supervisory Review
+      ▲                  │                                        │
+      └──── retry ◄──────┴───────── (bounded) ◄───────────────────┘
 ```
 
-### Review & Decision Layer
+Every external dependency (LLM, OCR engine, vector database) sits behind an adapter.
+By default the pipeline runs **fully offline** with deterministic mock/fake adapters,
+so you can clone it, run the tests and run the demo with no API keys.
 
-This system includes a review layer that categorizes invoices into operational queues, which are listed below:
+## What is real and what is mocked
 
-- **Auto-Approved Queue**  
-  Invoices with high-confidence matches and no material discrepancies.
+| Component | Offline default (used by tests/demo) | Real integration | Real integration tested? |
+|---|---|---|---|
+| Orchestration | LangGraph `StateGraph` (real) | — | Yes, it is what runs |
+| LLM | `FakeLLMAdapter`: deterministic, returns schema-shaped output | `LangChainLLMAdapter` wrapping OpenAI / Anthropic / Groq chat models through `with_structured_output` | Adapter logic tested against a stub chat model. **Not tested against a live API.** |
+| OCR | `MockOCRAdapter`: replays fixture text per attempt, with recorded confidence | `TesseractOCRAdapter` (pytesseract, Pillow, pdf2image) | **Not tested against real scans** (test is skipped when pytesseract isn't installed) |
+| Embeddings | `HashingEmbeddings`: lexical bag-of-words hash (implements LangChain `Embeddings`) | Any LangChain embedding model, e.g. `OpenAIEmbeddings` | **Not tested live** |
+| Vector store | `InMemoryVectorStore` (cosine) | `PineconeVectorStore` | Request/response mapping tested against a fake index. **Not tested against a live Pinecone index.** |
 
-- **Human Review Queue**  
-  Invoices with critical discrepancies, missing PO references, or low confidence scores.
+There are no accuracy or latency numbers here, because none have been measured on
+real documents. The demo reports one thing: whether the pipeline's routing matches
+the hand-labelled expected decision on the 8 synthetic sample documents.
 
-Invoices routed to human review are accompanied by:
-- Original PDF preview available
-- Full agent reasoning trace
-- AI-generated explanation summarizing the escalation rationale
+## The four agents
 
-### Agent Responsibilities
+| Agent | File | Responsibility |
+|---|---|---|
+| **OCR Extraction** | [app/agents/ocr_agent.py](app/agents/ocr_agent.py) | Calls the OCR adapter (with `attempt` = retry count, so retries can use heavier preprocessing). It normalizes text (Unicode NFKC, control characters, whitespace) and pulls candidate fields out of `Label: value` lines using a synonym table. |
+| **Field Validation** | [app/agents/validation_agent.py](app/agents/validation_agent.py) | Deterministic checks: required fields, date parsing, amount format, subtotal + tax = total, ISO currency, ID formats. **RAG checks**: customer ID ↔ name, billing currency, approval limit. Returns a typed `ValidationResult`. |
+| **Schema Structuring** | [app/agents/structuring_agent.py](app/agents/structuring_agent.py) | Asks the LLM for a `DocumentRecord` through structured output. The result is rejected if it fails Pydantic validation, or if the LLM changed a value that validation already verified (amount, date, IDs, currency). Retries are limited, then the document goes to review. |
+| **Supervisory Review** | [app/agents/supervisor_agent.py](app/agents/supervisor_agent.py) | A deterministic policy decides `APPROVE` / `RETRY` / `ESCALATE` with reasons. The LLM reviews the full evidence, and the final decision is the **more conservative** of the two: the LLM can escalate, but it can never approve something the policy escalated. |
 
-#### 1. Document Intelligence Agent
-Extracts and structures invoice data from PDFs:
-- Performs OCR on scanned and digital documents
-- Leverages LLM for intelligent data extraction
-- Produces structured JSON output with confidence scores
+## LangGraph workflow
 
-#### 2. Matching Agent
-Identifies corresponding purchase orders:
-- Direct PO number matching when available
-- Fuzzy item-based matching for missing PO numbers
-- Confidence scoring for match quality assessment
+Wiring: [app/graph/workflow.py](app/graph/workflow.py). Routing functions: [app/graph/routing.py](app/graph/routing.py) (pure functions, unit-tested). State: [app/graph/state.py](app/graph/state.py) (a `TypedDict`; `events` and `errors` use an additive reducer to build an audit trail).
 
-#### 3. Discrepancy Detection Agent
-Validates invoice accuracy against PO data:
-- Line-item price comparison
-- Quantity verification
-- Item presence validation
-- Supports configurable tolerance thresholds
+```mermaid
+flowchart TD
+    START([START]) --> OCR[OCR Extraction Agent]
+    OCR --> VAL[Field Validation Agent]
+    VAL -->|valid| STR[Schema Structuring Agent]
+    VAL -->|invalid + retryable + retries left| RETRY[prepare retry<br/>retry_count += 1]
+    VAL -->|invalid, not retryable or retries used| SUP[Supervisory Review Agent]
+    STR -->|schema-valid record| SUP
+    STR -->|schema error, attempts left| STR
+    STR -->|schema error, attempts used| SUP
+    SUP -->|RETRY + retries left| RETRY
+    SUP -->|APPROVE / ESCALATE| END([END])
+    RETRY --> OCR
+```
 
-#### 4. Resolution Recommendation Agent
-Applies business rules for decision making:
-- Confidence-weighted risk assessment
-- Multi-factor decision criteria
-- Escalation path determination
+### Retry and escalation design
 
-#### 5. Human Review Agent
-Provides human-in-the-loop oversight:
-- Reviews high-risk escalations
-- Overrides automated decisions when appropriate
-- Generates actionable feedback for process improvement
+* **Which failures are retried?** Each `ValidationIssue` carries a `retryable` flag:
+  * *Format errors* (`2O26-05-O7`, `4,3l0.00`, `U5D`) are always retryable. They are typical OCR misreads.
+  * *Content errors* (missing field, totals don't add up, future date) are retryable **only if OCR confidence was below 0.80**. On a clean scan a missing field is genuinely missing, and re-scanning won't fix it.
+  * *Reference-data conflicts* (wrong billing currency, ID belongs to another customer) are never retryable.
+* **Supervisor RETRY**: a document can pass validation but still have low overall confidence (< 0.75). The supervisor then asks for a re-scan, as long as retries are left.
+* **Bounded loops**: OCR retries are capped by `MAX_RETRIES` (default 2). Structuring attempts are capped by `MAX_STRUCTURING_ATTEMPTS` (default 2). The graph's `recursion_limit` is a hard backstop computed from both. A `RETRY` with no retries left becomes `ESCALATE`.
 
-## Technology Stack
+## RAG
 
-| Component | Technology | Purpose |
-|-----------|-----------|---------|
-| Orchestration | LangGraph | Agent coordination and workflow management |
-| LLM Inference | Groq API | Fast, cost-effective language model processing |
-| OCR Engine | Tesseract | Text extraction from scanned documents |
-| PDF Processing | pdf2image, Poppler | PDF rendering and image conversion |
-| Fuzzy Matching | RapidFuzz | Approximate string matching for reconciliation |
-| Frontend | Streamlit | Interactive user interface |
-| Runtime | Python 3.10+ | Core application runtime |
+[app/rag/](app/rag/): `chunk_text` → `Embeddings` → `VectorStore` → `Retriever`.
 
-## Installation
+The knowledge base is **reference data, not the documents being processed**. It
+holds customer master records (ID, registered name, billing currency, approval
+limit) and a short policy handbook ([tests/fixtures/reference/](tests/fixtures/reference/)).
+It is used for contextual validation and review:
 
-### Prerequisites
+* *Metadata-filtered lookup* by `customer_id` (`{"kind": "customer", "customer_id": ...}`), which maps directly to a Pinecone metadata filter.
+* *Semantic lookup* by customer name when the ID is unknown. This catches "known customer, wrong ID".
+* *Policy retrieval* for the document type. The chunks are passed to the supervisor as context and cited in its reasons.
 
-Ensure the following system dependencies are installed:
+Business rules are checked against structured chunk **metadata**, so the decisions
+are deterministic. The chunk **text** is what a real LLM supervisor reads.
 
-**macOS:**
+## Structured output: why it matters here
+
+`DocumentRecord` ([app/schemas/document.py](app/schemas/document.py)) enforces ID patterns, a
+positive 2-decimal amount, a supported currency, a date that isn't in the future, and
+"validation errors imply `review_required`". `LLMAdapter.invoke_structured` validates
+every LLM response against the requested schema and raises `StructuredOutputError`
+otherwise. Free-form JSON never gets into the pipeline state.
+
+## Project layout
+
+```
+app/
+  config.py              Settings (env-driven, offline defaults)
+  schemas/               Pydantic models: document, extraction, validation, review
+  adapters/              llm.py, ocr.py, vector_store.py: interface + offline + real
+  agents/                the four agents
+  graph/                 state.py, routing.py, workflow.py
+  rag/                   embeddings.py, retriever.py, knowledge_base.py
+  services/              document_service.py (single doc), batch_service.py (graph.batch)
+scripts/demo_pipeline.py
+tests/
+  unit/                  per-component tests
+  integration/           end-to-end LangGraph runs
+  fixtures/documents/    8 sample "scans" + manifest (expected decisions)
+  fixtures/reference/    customer master data + policies for RAG
+docs/                    architecture.md, pipeline.md
+legacy/                  earlier invoice/PO reconciliation prototype (Streamlit)
+```
+
+## Setup
+
+Python 3.11+.
+
 ```bash
-brew install tesseract poppler
+python -m venv .venv
 ```
 
-**Ubuntu/Debian:**
 ```bash
-sudo apt-get update
-sudo apt-get install tesseract-ocr poppler-utils
+source .venv/bin/activate        # Windows: .venv\Scripts\activate
 ```
 
-**Windows:**
-- Download and install [Tesseract OCR](https://github.com/UB-Mannheim/tesseract/wiki)
-- Download and install [Poppler for Windows](https://blog.alivate.com.au/poppler-windows/)
-
-### Python Dependencies
-
-```bash commands
-# Clone the repository
-git clone <repository-url>
-cd invoice_project
-
-# Install required packages
+```bash
 pip install -r requirements.txt
 ```
 
-### Environment Configuration
+Real integrations are optional: `pip install -r requirements-optional.txt`, then copy
+`.env.example` to `.env` and set e.g. `LLM_PROVIDER=openai`, `LLM_MODEL=<model>`,
+`VECTOR_STORE=pinecone`, `PINECONE_API_KEY=...`. The Pinecone index dimension must
+match the embedding dimension (256 for the hashing embeddings).
 
-Create a `.env` file in the project root:
-```bash
-GROQ_API_KEY=your_groq_api_key_here
-```
-
-## Usage
-
-### Command Line Interface
-
-Process all invoices in the `invoices/` directory:
+## Tests
 
 ```bash
-python main.py
+pytest -q
 ```
 
-Output JSON files will be saved to the `outputs/` directory.
+The suite is deterministic and needs no API keys or network. It covers the OCR adapter and text
+normalization, field extraction, every validation rule, the schema validators, the
+structuring guardrails (malformed output, tampered values), supervisor decisions and
+the LLM-can't-be-lenient rule, every routing branch, RAG chunking/embedding/retrieval,
+the Pinecone adapter mapping, and end-to-end graph runs, including bounded retries,
+structured-output retry, and batch failure isolation.
 
-### Streamlit Web Interface
-
-Launch the interactive UI:
+## Demo
 
 ```bash
-streamlit run app.py
+python scripts/demo_pipeline.py
 ```
 
-**Workflow:**
-1. Launch the Streamlit application
-2. Upload one or more invoice PDF files
-3. The system processes invoices through the multi-agent pipeline
-4. Observe real-time agent reasoning streamed step-by-step
-5. Review results in two operational tabs:
-   - **Auto Approved**: Clean invoices ready for payment
-   - **Needs Human Review**: Risky or uncertain invoices
-6. For human review cases:
-   - View original PDF inline
-   - Inspect agent reasoning and detected issues
-   - Read an LLM-generated explanation summarizing the escalation rationale
-
-## Project Structure
+Sample output (abridged):
 
 ```
-invoice_project/
-│
-├── agents/                      # Agent implementation modules
-│   ├── document_agent.py        # OCR and data extraction
-│   ├── matching_agent.py        # PO matching logic
-│   ├── discrepancy_agent.py     # Discrepancy detection
-│   ├── resolution_agent.py      # Decision recommendation
-│   └── human_review_agent.py    # Human-in-the-loop reviewer
-│
-├── invoices/                    # Sample invoice PDFs
-├── outputs/                     # Processing results (JSON)
-│
-├── app.py                       # Streamlit web interface
-├── graph.py                     # LangGraph orchestration
-├── llm.py                       # LLM wrapper and utilities
-├── ocr_utils.py                 # OCR processing functions
-├── main.py                      # CLI entry point
-├── purchase_orders.json         # PO database (sample data)
-├── requirements.txt             # Python dependencies
-└── README.md                    # This file
+Document: inv_004  (noisy first scan (O/0, l/1), clean on enhanced re-scan)
+  -> OCR completed (engine=mock, attempt=0, confidence=0.58, fields=9)
+  -> Validation failed: document_date=INVALID_DATE, total_amount=INVALID_AMOUNT
+  -> Retry 1/2: re-running OCR with enhanced preprocessing
+  -> OCR completed (engine=mock, attempt=1, confidence=0.91, fields=9)
+  -> Validation passed
+  -> Structured record created (attempt 1)
+  -> Supervisor: APPROVE - all required fields present and valid; ...
+  Retry count: 1
+  Final decision: APPROVE
 ```
 
-## Test Coverage
+Use `python scripts/demo_pipeline.py inv_005 inv_006` for specific documents, or `--json` for full results.
 
-The system has been validated against diverse invoice scenarios:
+| Sample | Scenario | Outcome |
+|---|---|---|
+| inv_001 | clean invoice | APPROVE |
+| inv_002 | receipt, different labels, DD/MM/YYYY, currency from `€` | APPROVE |
+| inv_003 | clean scan, customer ID genuinely missing | ESCALATE, no retry |
+| inv_004 | noisy scan, clean on re-scan | APPROVE after 1 retry |
+| inv_005 | persistently unreadable scan | ESCALATE after 2 retries |
+| inv_006 | total over the customer's approval limit (RAG) | ESCALATE |
+| inv_007 | currency violates the customer's billing policy (RAG) | ESCALATE |
+| inv_008 | valid, but low confidence; supervisor requests a re-scan | APPROVE after 1 retry |
 
-| Test Case | Description | Expected Outcome | Status |
-|-----------|-------------|------------------|--------|
-| Clean Invoice | Standard format, perfect match | AUTO_APPROVE | ✅ Pass |
-| Scanned Document | Low-quality scan, rotated image | AUTO_APPROVE | ✅ Pass |
-| Alternate Format | Non-standard template layout | AUTO_APPROVE | ✅ Pass |
-| Price Discrepancy | Material unit price mismatch | ESCALATE_TO_HUMAN | ✅ Pass |
-| Missing PO Reference | No PO number provided | ESCALATE_TO_HUMAN | ✅ Pass |
-| Quantity Mismatch | Incorrect quantities ordered | REQUEST_CLARIFICATION | ✅ Pass |
+## Batch processing
 
-### Reasoning Transparency & Explainability
+`BatchService` uses LangGraph's native `graph.batch(...)` with `max_concurrency`.
+A document that raises an exception is recorded as `ESCALATE` with the error, and the
+rest of the batch keeps going. The sample set is deliberately small; the same code path takes any number
+of `DocumentInput`s.
 
-Every agent contributes real-time reasoning to a shared execution state.  
-These reasoning steps are streamed live to the UI and displayed as a chat-style activity feed, enabling:
+## Not yet included
 
-- Clear visibility into agent handoffs
-- Step-by-step decision justification
-- Debugging and audit readiness
-
-For invoices escalated to human review, an additional LLM-generated explanation provides a concise, business-friendly summary of why manual intervention is required.
-
-## Limitations & Future Enhancements
-
-### Current Limitations
-
-- **OCR Accuracy**: Performance degrades with poor scan quality or complex layouts
-- **LLM Extraction**: Occasional structured output failures require fallback logic
-- **Matching Heuristics**: Rule-based approach may miss nuanced relationships
-- **Synchronous Processing**: Single-threaded execution limits throughput
-
-### Production Roadmap
-
-**Near-term Enhancements:**
-- Integrate layout-aware OCR (Azure Form Recognizer, Google Document AI)
-- Implement embedding-based semantic matching for improved accuracy
-- Add asynchronous processing with job queues (Celery, Redis)
-- Deploy comprehensive monitoring and alerting infrastructure
-
-**Long-term Vision:**
-- Machine learning model training from human feedback loop
-- Multi-modal document understanding (tables, charts, signatures)
-- Real-time drift detection and model retraining
-- Integration with enterprise ERP systems (SAP, Oracle, NetSuite)
-
-## Contributing
-
-Contributions are welcome! 
-## License
-
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
-
----
-
-**Author**: Aditya Suyal
-**Purpose**: Agent Development Internship Technical Assessment  
-**Contact**: https://www.linkedin.com/in/aditya-suyal/
-
----
-
-
-
-## Screenshots
-![Screenshot 4](Photos/Screenshot%202026-01-29%20at%209.21.43%E2%80%AFPM.png)
-![Screenshot 5](Photos/Screenshot%202026-01-29%20at%209.21.52%E2%80%AFPM.png)
-![Screenshot 6](Photos/Screenshot%202026-01-29%20at%209.22.13%E2%80%AFPM.png)
+FastAPI service, a Docker image for this pipeline, and an evaluation dataset of
+real scans. `Dockerfile` and the CD step currently deploy the legacy Streamlit
+prototype in [legacy/](legacy/). The CI test job runs this pipeline's suite.

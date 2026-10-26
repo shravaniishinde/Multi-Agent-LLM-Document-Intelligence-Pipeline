@@ -1,0 +1,10 @@
+[
+  {"customer_id": "CUST-1001", "customer_name": "Acme Corporation", "billing_currency": "USD",
+   "approval_limit": 25000, "region": "United States", "address": "100 Market Street, San Francisco, CA 94105"},
+  {"customer_id": "CUST-1002", "customer_name": "Globex GmbH", "billing_currency": "EUR",
+   "approval_limit": 20000, "region": "Germany", "address": "Friedrichstrasse 12, 10117 Berlin"},
+  {"customer_id": "CUST-1003", "customer_name": "Initech Ltd", "billing_currency": "GBP",
+   "approval_limit": 10000, "region": "United Kingdom", "address": "5 Canary Wharf, London E14 5AB"},
+  {"customer_id": "CUST-1004", "customer_name": "Umbrella Retail Pvt Ltd", "billing_currency": "INR",
+   "approval_limit": 1500000, "region": "India", "address": "22 MG Road, Bengaluru 560001"}
+]

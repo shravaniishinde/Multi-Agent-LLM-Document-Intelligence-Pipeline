@@ -1,0 +1,13 @@
+streamlit
+pdf2image
+pillow
+networkx
+numpy
+pytesseract
+opencv-python-headless
+
+langgraph
+langchain-core
+rapidfuzz
+groq
+tqdm

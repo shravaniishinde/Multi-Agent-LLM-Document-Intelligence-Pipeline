@@ -1,13 +1,5 @@
-streamlit
-pdf2image
-pillow
-networkx
-numpy
-pytesseract
-opencv-python-headless
-
-langgraph
-langchain-core
-rapidfuzz
-groq
-tqdm
+# Core pipeline - everything needed to run offline and to run the tests.
+pydantic>=2.7,<3
+langchain-core>=0.3
+langgraph>=0.2
+pytest>=8

@@ -1,0 +1,10 @@
+[project]
+name = "doc-intel-pipeline"
+version = "0.1.0"
+description = "Four-agent LangGraph pipeline for scanned-document extraction, validation and review"
+requires-python = ">=3.11"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["."]
+addopts = "-p no:cacheprovider"

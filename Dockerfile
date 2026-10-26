@@ -21,13 +21,14 @@
     # -------------------------------
     # Install Python dependencies
     # -------------------------------
-    COPY requirements.txt .
+    # The deployed Streamlit app is the legacy reconciliation prototype in legacy/.
+    COPY legacy/requirements.txt .
     RUN pip install --no-cache-dir -r requirements.txt
     
     # -------------------------------
     # Copy application code
     # -------------------------------
-    COPY . .
+    COPY legacy/ .
     
     # -------------------------------
     # Streamlit config

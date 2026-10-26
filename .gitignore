@@ -6,3 +6,4 @@ __pycache__/
 .pytest_cache/
 .coverage
 .DS_Store
+/Multi-Agent-LLM-Document-Intelligence-Pipeline/
