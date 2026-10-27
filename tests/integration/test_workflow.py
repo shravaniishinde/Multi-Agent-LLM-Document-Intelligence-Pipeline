@@ -5,12 +5,12 @@ import json
 import pytest
 
 from app.adapters.llm import FakeLLMAdapter
-from app.config import FIXTURES_DIR, Settings
+from app.config import DATA_DIR, Settings
 from app.schemas.document import DocumentInput
 from app.schemas.review import ReviewDecision
 from app.services import BatchService, DocumentService
 
-MANIFEST = json.loads((FIXTURES_DIR / "documents" / "manifest.json").read_text())
+MANIFEST = json.loads((DATA_DIR / "sample_documents" / "manifest.json").read_text())
 
 
 @pytest.fixture
@@ -22,7 +22,7 @@ def node_sequence(result):
     """Compress events into the node path the graph took."""
     prefixes = {"OCR": "ocr", "Validation": "validate", "Structur": "structure",
                 "Supervisor": "supervisor", "Retry": "retry"}
-    return [next(v for k, v in prefixes.items() if e.startswith(k)) for e in result.events]
+    return [v for e in result.events for k, v in prefixes.items() if e.startswith(k)]
 
 
 @pytest.mark.parametrize("doc_id", sorted(MANIFEST))
@@ -108,21 +108,24 @@ def test_batch_processing_summary(service):
     assert summary.total == len(MANIFEST)
     assert [r.document_id for r in summary.results] == sorted(MANIFEST)
     expected = sum(m["expected_decision"] == "APPROVE" for m in MANIFEST.values())
-    assert summary.by_decision["APPROVE"] == expected
+    assert summary.successful == summary.by_decision["APPROVE"] == expected
+    assert summary.escalated == len(MANIFEST) - expected and summary.failed == 0
     assert summary.total_retries == sum(m["expected_retries"] for m in MANIFEST.values())
 
 
 def test_batch_isolates_failures(service, monkeypatch):
-    docs = [DocumentInput(document_id="inv_001"), DocumentInput(document_id="inv_002")]
-    original_batch = service.graph.batch
+    docs = [DocumentInput(document_id=d) for d in ("inv_001", "inv_002", "inv_003")]
+    original_run = service.run
 
-    def flaky_batch(states, config=None, return_exceptions=False):
-        outputs = original_batch(states, config=config, return_exceptions=return_exceptions)
-        outputs[1] = RuntimeError("disk on fire")
-        return outputs
+    def flaky_run(document, correlation_id=""):
+        if document.document_id == "inv_002":
+            raise RuntimeError("disk on fire")
+        return original_run(document, correlation_id)
 
-    monkeypatch.setattr(service.graph, "batch", flaky_batch)
+    monkeypatch.setattr(service, "run", flaky_run)
     summary = BatchService(service).process_many(docs)
+    assert [r.status for r in summary.results] == ["completed", "failed", "completed"]
     assert summary.results[0].decision == ReviewDecision.APPROVE
     assert summary.results[1].decision == ReviewDecision.ESCALATE
     assert "disk on fire" in summary.results[1].review.reasons[0]
+    assert (summary.successful, summary.escalated, summary.failed) == (1, 1, 1)

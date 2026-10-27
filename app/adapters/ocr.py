@@ -133,4 +133,4 @@ class TesseractOCRAdapter(OCRAdapter):
 def build_ocr(settings: Settings) -> OCRAdapter:
     if settings.ocr_provider == "tesseract":
         return TesseractOCRAdapter()
-    return MockOCRAdapter(settings.fixtures_dir / "documents")
+    return MockOCRAdapter(settings.documents_dir)

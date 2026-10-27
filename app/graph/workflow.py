@@ -27,12 +27,16 @@ from app.graph.routing import (
     route_after_validation,
 )
 from app.graph.state import PipelineState
+from app.observability import log_event
 from app.rag.retriever import Retriever
 
 
 def make_retry_node(settings: Settings):
     def prepare_retry(state: PipelineState) -> dict:
         retry = state.get("retry_count", 0) + 1
+        reason = "supervisor requested re-scan" if state.get("decision") else "retryable validation errors"
+        log_event("retry_started", state, retry_count=retry, max_retries=settings.max_retries,
+                  reason=reason)
         return {
             "retry_count": retry,
             "validation": None,

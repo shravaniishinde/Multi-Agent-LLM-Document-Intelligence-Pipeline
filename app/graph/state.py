@@ -18,6 +18,7 @@ from app.schemas.validation import ValidationResult
 
 class PipelineState(TypedDict, total=False):
     document_id: str
+    correlation_id: str
     document: DocumentInput
     raw_text: str
     ocr_result: OCRResult | None
@@ -28,6 +29,8 @@ class PipelineState(TypedDict, total=False):
     structuring_attempts: int
     structuring_error: str | None
     retry_count: int
+    validation_failures: int
+    structuring_failures: int
     review: SupervisorReview | None
     decision: ReviewDecision | None
     errors: Annotated[list[str], operator.add]
@@ -35,14 +38,17 @@ class PipelineState(TypedDict, total=False):
     metadata: dict[str, Any]
 
 
-def initial_state(document: DocumentInput) -> PipelineState:
+def initial_state(document: DocumentInput, correlation_id: str = "") -> PipelineState:
     return PipelineState(
         document_id=document.document_id,
+        correlation_id=correlation_id,
         document=document,
         retry_count=0,
+        validation_failures=0,
+        structuring_failures=0,
         structuring_attempts=0,
         retrieved_context=[],
         errors=[],
-        events=[],
+        events=["Document received"],
         metadata={},
     )

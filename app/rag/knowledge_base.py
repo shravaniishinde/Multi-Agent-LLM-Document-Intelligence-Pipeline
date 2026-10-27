@@ -42,5 +42,5 @@ def load_reference_documents(reference_dir: Path) -> list[ReferenceDocument]:
 
 def build_retriever(settings: Settings) -> Retriever:
     retriever = Retriever(build_embeddings(settings), build_vector_store(settings))
-    retriever.index(load_reference_documents(settings.fixtures_dir / "reference"))
+    retriever.index(load_reference_documents(settings.reference_dir))
     return retriever

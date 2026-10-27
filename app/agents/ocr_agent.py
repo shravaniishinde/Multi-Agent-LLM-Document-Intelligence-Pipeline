@@ -8,11 +8,13 @@ rule-based means the LLM is only used where judgement is needed.
 
 from __future__ import annotations
 
+import logging
 import re
 import unicodedata
 
 from app.adapters.ocr import OCRAdapter, OCRError
 from app.graph.state import PipelineState
+from app.observability import log_event
 from app.schemas.extraction import ExtractedFields
 
 # Normalized label -> ExtractedFields attribute.
@@ -107,6 +109,7 @@ class OCRAgent:
         try:
             result = self.ocr.extract(state["document"], attempt=attempt)
         except OCRError as exc:
+            log_event("ocr_failed", state, logging.WARNING, attempt=attempt, error=str(exc))
             return {
                 "ocr_result": None,
                 "raw_text": "",
@@ -117,6 +120,8 @@ class OCRAgent:
         text = normalize_text(result.text)
         result = result.model_copy(update={"text": text})
         fields = extract_fields(text)
+        log_event("ocr_completed", state, engine=result.engine, attempt=attempt,
+                  confidence=result.confidence, fields_found=sorted(fields.present()))
         return {
             "ocr_result": result,
             "raw_text": text,

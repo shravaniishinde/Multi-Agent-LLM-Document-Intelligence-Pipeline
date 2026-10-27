@@ -8,10 +8,12 @@ model can format and enrich but cannot silently rewrite facts.
 
 from __future__ import annotations
 
+import logging
 from decimal import Decimal
 
 from app.adapters.llm import LLMAdapter, StructuredOutputError
 from app.graph.state import PipelineState
+from app.observability import log_event
 from app.schemas.document import DocumentRecord
 
 INSTRUCTIONS = """You convert OCR text from a business document into a DocumentRecord.
@@ -62,13 +64,18 @@ class StructuringAgent:
             _check_locked_fields(record, normalized)
         except StructuredOutputError as exc:
             message = str(exc).splitlines()[0][:200]
+            log_event("structuring_failed", state, logging.WARNING, attempt=attempts,
+                      llm=self.llm.name, error=message)
             return {
                 "record": None,
                 "structuring_attempts": attempts,
+                "structuring_failures": state.get("structuring_failures", 0) + 1,
                 "structuring_error": message,
                 "errors": [f"structuring attempt {attempts}: {message}"],
                 "events": [f"Structured output rejected (attempt {attempts}): {message}"],
             }
+        log_event("structuring_completed", state, attempt=attempts, llm=self.llm.name,
+                  document_type=record.document_type.value, confidence=record.confidence)
         return {
             "record": record,
             "structuring_attempts": attempts,

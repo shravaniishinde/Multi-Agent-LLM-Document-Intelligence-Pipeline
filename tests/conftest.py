@@ -2,7 +2,7 @@ import pytest
 
 from app.adapters.llm import FakeLLMAdapter
 from app.adapters.ocr import MockOCRAdapter
-from app.config import FIXTURES_DIR, Settings
+from app.config import DATA_DIR, Settings
 from app.rag.knowledge_base import build_retriever
 from app.schemas.extraction import ExtractedFields
 
@@ -19,7 +19,7 @@ def retriever(settings):
 
 @pytest.fixture
 def mock_ocr():
-    return MockOCRAdapter(FIXTURES_DIR / "documents")
+    return MockOCRAdapter(DATA_DIR / "sample_documents")
 
 
 @pytest.fixture

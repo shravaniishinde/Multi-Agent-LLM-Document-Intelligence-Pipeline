@@ -9,10 +9,10 @@ from __future__ import annotations
 
 from typing import Any
 
-from langchain_core.embeddings import Embeddings
 from pydantic import BaseModel, Field
 
 from app.adapters.vector_store import VectorRecord, VectorStore
+from app.rag.embeddings import EmbeddingProvider
 
 
 class ReferenceDocument(BaseModel):
@@ -41,7 +41,7 @@ def chunk_text(text: str, chunk_size: int = 80, overlap: int = 15) -> list[str]:
 
 
 class Retriever:
-    def __init__(self, embeddings: Embeddings, store: VectorStore,
+    def __init__(self, embeddings: EmbeddingProvider, store: VectorStore,
                  chunk_size: int = 80, overlap: int = 15):
         self.embeddings = embeddings
         self.store = store

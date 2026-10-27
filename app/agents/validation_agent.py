@@ -12,12 +12,14 @@ Retry policy, encoded in each issue's `retryable` flag:
 
 from __future__ import annotations
 
+import logging
 import re
 from datetime import date, datetime
 from decimal import Decimal, InvalidOperation
 
 from app.config import Settings
 from app.graph.state import PipelineState
+from app.observability import log_event
 from app.rag.retriever import RetrievedChunk, Retriever
 from app.schemas.document import (
     CUSTOMER_ID_PATTERN,
@@ -229,11 +231,28 @@ class ValidationAgent:
     def __call__(self, state: PipelineState) -> dict:
         fields = state.get("extracted_fields") or ExtractedFields()
         ocr = state.get("ocr_result")
+        retry_count = state.get("retry_count", 0)
+        log_event("validation_started", state, retry_count=retry_count)
         result, context = self.validate(fields, ocr.confidence if ocr else 0.0)
+
+        events = []
+        if self.retriever is not None:
+            ids = [c.id for c in context]
+            log_event("rag_retrieval_completed", state, chunks=len(ids), chunk_ids=ids)
+            events.append(f"RAG retrieval completed: {len(ids)} reference chunk(s)"
+                          + (f" ({', '.join(ids)})" if ids else ""))
+
+        update: dict = {"validation": result, "retrieved_context": context}
         if result.valid:
+            log_event("validation_passed", state, retry_count=retry_count,
+                      confidence=result.confidence, warnings=[str(w) for w in result.warnings])
             note = f" ({len(result.warnings)} warning(s))" if result.warnings else ""
-            event = f"Validation passed{note}"
+            events.append(f"Validation passed{note}")
         else:
-            event = "Validation failed: " + ", ".join(
-                f"{e.field}={e.code.value}" for e in result.errors)
-        return {"validation": result, "retrieved_context": context, "events": [event]}
+            log_event("validation_failed", state, logging.WARNING, retry_count=retry_count,
+                      retryable=result.retryable, errors=[str(e) for e in result.errors])
+            events.append("Validation failed: " + ", ".join(
+                f"{e.field}={e.code.value}" for e in result.errors))
+            update["validation_failures"] = state.get("validation_failures", 0) + 1
+        update["events"] = events
+        return update

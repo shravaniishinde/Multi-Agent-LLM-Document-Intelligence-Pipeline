@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from enum import Enum
+from typing import Literal
 
 from pydantic import BaseModel, Field
 
@@ -34,6 +35,9 @@ class SupervisorReview(BaseModel):
 
 class ProcessingResult(BaseModel):
     document_id: str
+    # "completed": the pipeline reached a decision; "failed": it raised (decision is ESCALATE).
+    status: Literal["completed", "failed"] = "completed"
+    correlation_id: str = ""
     decision: ReviewDecision
     review: SupervisorReview
     record: DocumentRecord | None = None
@@ -41,5 +45,8 @@ class ProcessingResult(BaseModel):
     validation: ValidationResult | None = None
     retry_count: int = 0
     structuring_attempts: int = 0
+    validation_failures: int = 0
+    structuring_failures: int = 0
+    processing_ms: float = 0.0
     events: list[str] = Field(default_factory=list)
     errors: list[str] = Field(default_factory=list)

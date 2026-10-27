@@ -1,7 +1,7 @@
 import pytest
 
 from app.adapters.vector_store import InMemoryVectorStore, PineconeVectorStore, VectorRecord
-from app.config import FIXTURES_DIR
+from app.config import DATA_DIR
 from app.rag.embeddings import HashingEmbeddings
 from app.rag.knowledge_base import load_reference_documents
 from app.rag.retriever import ReferenceDocument, Retriever, chunk_text
@@ -34,7 +34,7 @@ def test_in_memory_store_ranks_and_filters():
 
 
 def test_reference_documents_load():
-    docs = load_reference_documents(FIXTURES_DIR / "reference")
+    docs = load_reference_documents(DATA_DIR / "reference")
     kinds = {d.metadata["kind"] for d in docs}
     assert kinds == {"customer", "policy"}
     acme = next(d for d in docs if d.id == "customer-CUST-1001")

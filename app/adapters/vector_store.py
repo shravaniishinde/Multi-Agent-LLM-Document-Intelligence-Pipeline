@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import logging
 import math
 from abc import ABC, abstractmethod
 from typing import Any
@@ -9,6 +10,7 @@ from typing import Any
 from pydantic import BaseModel, Field
 
 from app.config import Settings
+from app.observability import log_event
 
 
 class VectorRecord(BaseModel):
@@ -67,8 +69,30 @@ class InMemoryVectorStore(VectorStore):
 class PineconeVectorStore(VectorStore):
     """Pinecone serverless index. Pass `index` to inject a client (used in tests).
 
-    Metadata equality filters are translated to Pinecone's `{"field": {"$eq": v}}`.
+    Plain equality filters are translated to Pinecone's `{"field": {"$eq": v}}`;
+    values that are already operator dicts (`{"$in": [...]}`) pass through.
     """
+
+    @classmethod
+    def from_settings(cls, settings: Settings, client: Any = None,
+                      spec_factory: Any = None) -> "PineconeVectorStore":
+        """Connect using env-derived settings; optionally create the index if missing."""
+        if not settings.pinecone_configured:
+            raise ValueError("PINECONE_API_KEY is not set")
+        if client is None:
+            from pinecone import Pinecone
+
+            client = Pinecone(api_key=settings.pinecone_api_key.get_secret_value())
+        name = settings.pinecone_index
+        if settings.pinecone_create_index and not _index_exists(client, name):
+            if spec_factory is None:
+                from pinecone import ServerlessSpec as spec_factory
+            client.create_index(name=name, dimension=settings.embedding_dim,
+                                metric=settings.pinecone_metric,
+                                spec=spec_factory(cloud=settings.pinecone_cloud,
+                                                  region=settings.pinecone_region))
+            log_event("pinecone_index_created", index=name, dimension=settings.embedding_dim)
+        return cls(index=client.Index(name), namespace=settings.pinecone_namespace)
 
     def __init__(self, api_key: str | None = None, index_name: str | None = None,
                  namespace: str = "", index: Any = None):
@@ -83,7 +107,10 @@ class PineconeVectorStore(VectorStore):
 
     def upsert(self, records: list[VectorRecord]) -> None:
         self.index.upsert(
-            vectors=[{"id": r.id, "values": r.values, "metadata": r.metadata} for r in records],
+            vectors=[{"id": r.id, "values": r.values,
+                      # Pinecone rejects null metadata values.
+                      "metadata": {k: v for k, v in r.metadata.items() if v is not None}}
+                     for r in records],
             namespace=self.namespace,
         )
 
@@ -92,7 +119,8 @@ class PineconeVectorStore(VectorStore):
         kwargs: dict[str, Any] = {"vector": vector, "top_k": top_k,
                                   "include_metadata": True, "namespace": self.namespace}
         if filter:
-            kwargs["filter"] = {k: {"$eq": v} for k, v in filter.items()}
+            kwargs["filter"] = {k: v if isinstance(v, dict) else {"$eq": v}
+                                for k, v in filter.items()}
         response = self.index.query(**kwargs)
         matches = response["matches"] if isinstance(response, dict) else response.matches
         return [
@@ -106,8 +134,27 @@ def _get(obj: Any, key: str) -> Any:
     return obj[key] if isinstance(obj, dict) else getattr(obj, key)
 
 
+def _index_exists(client: Any, name: str) -> bool:
+    if hasattr(client, "has_index"):
+        return bool(client.has_index(name))
+    return name in client.list_indexes().names()
+
+
 def build_vector_store(settings: Settings) -> VectorStore:
-    if settings.vector_store == "pinecone":
-        return PineconeVectorStore(settings.pinecone_api_key, settings.pinecone_index,
-                                   settings.pinecone_namespace)
-    return InMemoryVectorStore()
+    """Pinecone when selected *and* usable; otherwise the offline in-memory store.
+
+    Missing credentials or a missing `pinecone` package degrade to offline mode
+    with a warning instead of stopping the service. Bad credentials still fail.
+    """
+    if settings.vector_store != "pinecone":
+        return InMemoryVectorStore()
+    if not settings.pinecone_configured:
+        log_event("vector_store_fallback", level=logging.WARNING,
+                  reason="PINECONE_API_KEY not set", using="memory")
+        return InMemoryVectorStore()
+    try:
+        return PineconeVectorStore.from_settings(settings)
+    except ImportError:
+        log_event("vector_store_fallback", level=logging.WARNING,
+                  reason="pinecone package not installed", using="memory")
+        return InMemoryVectorStore()

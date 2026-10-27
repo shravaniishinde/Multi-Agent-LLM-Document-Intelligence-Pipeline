@@ -18,8 +18,12 @@ from app.config import Settings
 
 _TOKEN = re.compile(r"[a-z0-9]+")
 
+# The embedding interface the RAG layer depends on. Any LangChain `Embeddings`
+# (embed_documents / embed_query) satisfies it.
+EmbeddingProvider = Embeddings
 
-class HashingEmbeddings(Embeddings):
+
+class HashingEmbeddings(EmbeddingProvider):
     def __init__(self, dim: int = 256):
         self.dim = dim
 
@@ -40,9 +44,9 @@ class HashingEmbeddings(Embeddings):
         return self._embed(text)
 
 
-def build_embeddings(settings: Settings) -> Embeddings:
+def build_embeddings(settings: Settings) -> EmbeddingProvider:
     if settings.embedding_provider == "openai":
         from langchain_openai import OpenAIEmbeddings
 
-        return OpenAIEmbeddings()
+        return OpenAIEmbeddings(dimensions=settings.embedding_dim)
     return HashingEmbeddings(settings.embedding_dim)

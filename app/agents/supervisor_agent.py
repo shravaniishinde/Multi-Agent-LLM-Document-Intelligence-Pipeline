@@ -15,6 +15,7 @@ from __future__ import annotations
 from app.adapters.llm import LLMAdapter, StructuredOutputError
 from app.config import Settings
 from app.graph.state import PipelineState
+from app.observability import log_event
 from app.schemas.review import DECISION_SEVERITY, ReviewDecision, SupervisorReview
 from app.schemas.validation import IssueCode
 
@@ -99,6 +100,7 @@ class SupervisorAgent:
         try:
             review = self.llm.invoke_structured(SupervisorReview, INSTRUCTIONS, payload)
         except StructuredOutputError as exc:
+            log_event("supervisor_llm_invalid", state, error=str(exc).splitlines()[0][:200])
             review = rule
             events.append(f"Supervisor LLM output invalid, using policy review ({exc})")
 
@@ -110,5 +112,8 @@ class SupervisorAgent:
                 "decision": ReviewDecision.ESCALATE,
                 "reasons": review.reasons + ["retry budget exhausted"]})
 
+        log_event("supervisor_decision", state, decision=review.decision.value,
+                  policy_decision=rule.decision.value, reasons=review.reasons,
+                  retry_count=state.get("retry_count", 0))
         events.append(f"Supervisor: {review.decision.value} - {'; '.join(review.reasons)}")
         return {"review": review, "decision": review.decision, "events": events}

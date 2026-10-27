@@ -1,5 +1,6 @@
-# Core pipeline - everything needed to run offline and to run the tests.
+# Runtime - everything the offline pipeline and the API need.
 pydantic>=2.7,<3
 langchain-core>=0.3
 langgraph>=0.2
-pytest>=8
+fastapi>=0.115
+uvicorn>=0.30

@@ -1,8 +1,8 @@
 > **Legacy prototype.** This is the earlier invoice-to-purchase-order reconciliation app
-> (Streamlit + Groq). It is kept for reference and is what the `Dockerfile` and Render deploy
-> still ship. Run it from this folder: `pip install -r requirements.txt && streamlit run app.py`
-> (needs `GROQ_API_KEY`, tesseract and poppler). The current pipeline is documented in the
-> top-level README.
+> (Streamlit + Groq), kept for reference. Run it from this folder:
+> `pip install -r requirements.txt && streamlit run app.py` (needs `GROQ_API_KEY`, tesseract
+> and poppler), or build its image with `docker build -t invoice-recon legacy/`.
+> The current pipeline and API are documented in the top-level README.
 
 # Invoice Reconciliation Multi-Agent System
 
