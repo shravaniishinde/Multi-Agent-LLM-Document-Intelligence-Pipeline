@@ -1,0 +1,13 @@
+.git
+.github
+.venv
+venv
+.env
+**/__pycache__
+**/*.pyc
+.pytest_cache
+legacy
+tests
+docs
+Multi-Agent-LLM-Document-Intelligence-Pipeline
+*.md

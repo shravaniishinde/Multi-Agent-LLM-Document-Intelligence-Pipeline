@@ -1,0 +1,22 @@
+# Offline by default: `docker compose up --build` needs no credentials.
+# To use real providers, export the variables (or put them in .env) before `up`.
+services:
+  api:
+    build: .
+    image: doc-intel-pipeline:local
+    ports:
+      - "${API_PORT:-8000}:8000"
+    environment:
+      LLM_PROVIDER: ${LLM_PROVIDER:-fake}
+      LLM_MODEL: ${LLM_MODEL:-}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+      GROQ_API_KEY: ${GROQ_API_KEY:-}
+      OCR_PROVIDER: ${OCR_PROVIDER:-mock}
+      VECTOR_STORE: ${VECTOR_STORE:-memory}
+      PINECONE_API_KEY: ${PINECONE_API_KEY:-}
+      PINECONE_INDEX: ${PINECONE_INDEX:-doc-intel-reference}
+      PINECONE_NAMESPACE: ${PINECONE_NAMESPACE:-reference}
+      MAX_RETRIES: ${MAX_RETRIES:-2}
+      LOG_FORMAT: ${LOG_FORMAT:-json}
+    restart: unless-stopped

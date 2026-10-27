@@ -1,0 +1,11 @@
+INVOICE
+
+Invoice Number: INV-20702
+Date: 2026-07-15
+Customer: Globex GmbH
+Customer ID: CUST-1002
+
+Implementation workshop
+
+Total: 6,200.00
+Currency: USD

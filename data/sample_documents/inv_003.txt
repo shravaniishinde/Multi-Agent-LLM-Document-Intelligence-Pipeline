@@ -1,0 +1,13 @@
+INVOICE
+
+Invoice Number: INV-20502
+Date: 2026-04-21
+Customer: Initech Ltd
+Address: 5 Canary Wharf, London E14 5AB
+
+Consulting services (April)
+
+Subtotal: 2,000.00
+Tax: 400.00
+Total: 2,400.00
+Currency: GBP

@@ -1,0 +1,14 @@
+INVOICE
+
+Invoice Number: INV-20688
+Date: 2026-06-30
+Customer: Acme Corporation
+Customer ID: CUST-1001
+Address: 100 Market Street, San Francisco, CA 94105
+
+Data centre migration - fixed fee
+
+Subtotal: 44,907.41
+Tax: 3,592.59
+Total: 48,500.00
+Currency: USD

@@ -1,0 +1,12 @@
+RECEIPT
+Payment received - thank you
+
+Receipt No: RCT-7781
+Date: 02/04/2026
+Billed To: Globex GmbH
+Client ID: CUST-1002
+Address: Friedrichstrasse 12, 10117 Berlin
+
+Annual licence renewal
+
+Total: € 3,480.00

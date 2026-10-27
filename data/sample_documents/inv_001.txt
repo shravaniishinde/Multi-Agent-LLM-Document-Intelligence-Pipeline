@@ -1,0 +1,17 @@
+INVOICE
+Acme Corporation Billing Department
+
+Invoice Number: INV-20431
+Date: 2026-03-14
+Customer: Acme Corporation
+Customer ID: CUST-1001
+Address: 100 Market Street, San Francisco, CA 94105
+
+Description              Qty    Amount
+Cloud hosting (March)      1    1,000.00
+Support plan               1      150.00
+
+Subtotal: 1,150.00
+Tax: 92.00
+Total: 1,242.00
+Currency: USD

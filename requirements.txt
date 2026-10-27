@@ -1,13 +1,6 @@
-streamlit
-pdf2image
-pillow
-networkx
-numpy
-pytesseract
-opencv-python-headless
-
-langgraph
-langchain-core
-rapidfuzz
-groq
-tqdm
+# Runtime - everything the offline pipeline and the API need.
+pydantic>=2.7,<3
+langchain-core>=0.3
+langgraph>=0.2
+fastapi>=0.115
+uvicorn>=0.30

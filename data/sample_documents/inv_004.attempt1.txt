@@ -1,0 +1,13 @@
+INVOICE
+
+Invoice Number: INV-20577
+Date: 2026-05-07
+Customer: Initech Ltd
+Customer ID: CUST-1003
+
+Hardware replacement parts
+
+Subtotal: 3,591.67
+Tax: 718.33
+Total: 4,310.00
+Currency: GBP
